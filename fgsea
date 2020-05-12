@@ -1,0 +1,94 @@
+library(msigdbr)
+library(tibble)
+library(fgsea)
+library(xlsx)
+library(ggplot2)
+
+
+#Download required pathways from msigdbr package
+
+m_df = msigdbr(species = "Homo sapiens", category ="C2", subcategory="CP:REACTOME")
+m_df
+#create list to use
+m_list = m_df %>% split(x = .$gene_symbol, f = .$gs_name)
+m_list
+
+#Find DEGs between two groups
+
+panoTnmark <- FindMarkers(panoTn, ident.1="Panobinostat", ident.2="Control")
+panoTnmark <- subset(panoTnmark, p_val_adj <0.05)
+
+#Create new dataframe with gene names and test statistics/logFC values
+
+panoTnstats <- data.frame("genes"=rownames(panoTnmark),
+                          "logFC"=panoTnmark$avg_logFC)
+                          
+#Convert dataframe to a named list
+ 
+ranks <- deframe(panoTnstats)
+head(ranks, 20)
+
+#Run GSEA algorithm
+
+fgseaRes <- fgsea(pathways = m_list, 
+                  stats = ranks,
+                  minSize=15,
+                  maxSize=500,
+                  nperm=10000)
+
+#Save genes to an excel file
+write.xlsx(x, file="name.xlsx", sheetName="name")
+
+
+x <- as.data.frame(fgseaRes)
+x <- x[,c("pathway", "padj", "NES", "ES", "pval")]
+
+
+#Save dataframe to an excel file
+write.xlsx(x, file="name.xlsx", sheetName="name")
+
+xup <- x[x$ES>0,] #positive enrichment score
+xup <- xup[order(xup$pval),] #arrange by raw p-val
+xup <- head(xup, 5) #get top five pathways
+xup
+xdown <- x[x$ES<0,] #negative enrichment score
+xdown <- xdown[order(-xdown$pval),] #order by raw p-val (reverse order)
+xdown <- tail(xdown,5) #get top (bottom) 5 pathways
+xcombo <-rbind(xup, xdown) #create new dataframe with top 5 positive and top 5 negative pathways
+xcombo
+xcombo$log10p <- -log10(xcombo$padj) #convert p-val to -logp (optional)
+
+#rename pathway names from standard format
+xcombo$pway <-   c("Cilium Assembly","Cellular senescence","Organelle biogenesis and maintenance", "NMD independent of exon junction complex",
+                   "RRNA processing in the nucleus and cytosol","Adaptive immune system", "TCR signaling",
+                   "Generation of second messenger molecules","Immunoregulatory interactions between lymphoid/non-lymphoid",
+                   "Cytokine signaling in immune system")
+                   
+#reverse order of pathways for plotting
+xcombo$pway <- factor(xcombo$pway, levels=c(rev(xcombo$pway)))
+#add column identifying whether NES is negative or positive (for colour coding in plot)
+xcombo$posneg <- ifelse(xcombo$NES > 0, "pos", "neg")
+
+#make bar plot
+
+Tnbar <- ggplot(xcombo, aes(x=reorder(pway, NES),NES))+
+  geom_col(aes(fill = posneg), width = 0.7)+coord_flip()+
+  scale_fill_manual(name="", breaks=c("pos", "neg"), values=c("red", "blue"), labels = c("Positive enrichment score", "Negative enrichment score"))+
+  theme(legend.position = "none")+
+  theme_classic()+
+  theme(axis.text.x = element_text("NES", color="black", 
+                                   size=12, face="bold"),
+        axis.text.y = element_text("-log10p",color="black", 
+                                   size=12, face="bold"))+
+  ylab("")+
+  theme(axis.title.y = element_text( face="bold", size=15))+
+  theme(axis.title.x = element_text( face="bold", size=15))+
+  xlab("")+
+  theme(legend.text=element_text(size=10, face="bold"))+
+  theme(legend.title=element_text(size=12, face="bold"))+
+  theme(legend.title=element_text(size=12, face="bold"))+
+  theme(legend.text=element_text(size=12, face="bold"))+
+  theme(axis.text.x= element_text( face='bold'))+
+  ylim(-3,5)
+Tnbar
+
