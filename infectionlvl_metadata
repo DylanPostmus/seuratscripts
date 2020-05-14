@@ -1,0 +1,18 @@
+# adding infection metadata
+moi01_24sel$infection <- 'moi01'
+moi10_24sel$infection <- 'moi10'
+mock_24sel$infection <- 'mock'
+#Integration, scaling, PCA, UMAPs, clustering...
+# creating subsets for infection status and low/high CHIKV RNA combined
+Idents(integrated24_mock_moi10_moi01_clus) <- "infection"
+moi10_high <- WhichCells(object = integrated24_mock_moi10_moi01_clus, expression = `CHIKV-sp` > 4.2, idents = "moi10")
+moi10_low <- WhichCells(object = integrated24_mock_moi10_moi01_clus, expression = `CHIKV-sp` < 4.2, idents = "moi10")
+moi01_high <- WhichCells(object = integrated24_mock_moi10_moi01_clus, expression = `CHIKV-sp` > 3, idents = "moi01")
+moi01_low <- WhichCells(object = integrated24_mock_moi10_moi01_clus, expression = `CHIKV-sp` < 3, idents = "moi01")
+mock <- WhichCells(object = integrated24_mock_moi10_moi01_clus, expression = `CHIKV-sp` == 0, idents = "mock")
+# creating metadata for each cell with the information which MOI and CHIKV RNA low/high
+integrated24_mock_moi10_moi01_clus[["chikrnalvl"]] <- ifelse(rownames(integrated24_mock_moi10_moi01_clus@meta.data) %in% moi10_high, "moi10_high",
+ifelse(rownames(integrated24_mock_moi10_moi01_clus@meta.data) %in% moi10_low, "moi10_low",
+                                                               ifelse(rownames(integrated24_mock_moi10_moi01_clus@meta.data) %in% moi01_high, "moi01_high",
+                                                               ifelse(rownames(integrated24_mock_moi10_moi01_clus@meta.data) %in% moi01_low, "moi01_low",
+                                                               ifelse(rownames(integrated24_mock_moi10_moi01_clus@meta.data) %in% mock, "mock", "undefined")))))
